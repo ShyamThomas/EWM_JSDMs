@@ -1,0 +1,150 @@
+library(tidyverse)
+library(reshape2)
+library(ggplot2)
+library(lubridate)
+
+setwd("~/UMNpostdoc/ProjectEWM/RProjects/JSDMs_hmsc/Data")
+
+### First step: read the files needed (All these files were downloaded from USGS science base website)
+irrad.files=list.files("WithinLakeData/IrradianceData/AllIrradianceData/")
+head(irrad.files) 
+
+kd.files=list.files("WithinLakeData/ClarityData/AllClarityData/")
+head(kd.files)
+
+#########################################################################################################
+######### Codes from Gretchen to link MNDOW lake ids with NHDHR ids... might need them later.
+#########################################################################################################
+
+mn.ids2=read_csv("~/UMNpostdoc/ProjectEWM/RProjects/JSDMs_hmsc/Data/mndow_nhdhr_xwalk.csv")
+head(mn.ids2)
+length(mn.ids2$MNDOW_ID)
+mn.ids=unique(na.omit(mn.ids2$site_id))
+head(mn.ids)
+mn.files=data.frame("site_id"=(mn.ids), file.name=NA)
+head(mn.files)
+
+for(i in 1:length(mn.ids))
+{
+  mn.files$file.name[i]=paste("pb0_", mn.ids[i],"_irradiance.csv",sep="")
+}
+head(mn.files)
+available.irr.files=mn.files[mn.files$file.name%in%irrad.files,]
+head(available.irr.files)
+length(available.irr.files$file.name)
+
+#########################################################################################################
+### A simple function to split large csv files to smaller subsets with data (2000 onwards) that's most needed
+### The function also splits event dates into more detailed multiple columns of year, month,& day-of-year
+
+modify_and_save_from_dataset <- function(csvfile) {
+  df = read_csv(csvfile)
+  df_new=df%>% filter(df$date > "1999-12-31")%>%
+    dplyr::mutate(year = lubridate::year(date),
+                  month = lubridate::month(date),
+                  day = lubridate::day(date),
+                  yearday=lubridate::yday(date))
+  
+  csvfile_new = gsub(".csv", "_modified.csv", csvfile)
+  write_csv(df_new, csvfile_new)
+}
+
+### Now read the Irradiance and Clarity files and modify them using the above function
+for (csvfile in irrad.files){
+  modify_and_save_from_dataset(csvfile)
+}
+
+###Repeat the same for Kd files...
+for (csvfile in kd.files){
+  modify_and_save_from_dataset(csvfile)
+}
+
+#### All the modified files were then copied into two new folders: "IrradModified" & "ClarityModified"
+
+####### Now, bind all the separate files into a single one with filenames as a row id
+###Step 1: read the all the modified files
+irrad.modi.files=list.files("Data/WithinLakeData/IrradianceData/IrradModified/")
+head(irrad.modi.files)
+kd.modi.files=list.files("Data/WithinLakeData/ClarityData/ClarityModified/")
+head(kd.modi.files)
+
+### Step 2: make a simple function to bind all the files by rows with filename added as a column
+
+all_Kd.modi = do.call(rbind, lapply(kd.modi.files, function(x)
+transform(read.csv(paste("Data/WithinLakeData/ClarityData/ClarityModified/",x, sep="")), File = basename(x))))
+head(all_Kd.modi)
+length(unique(all_Kd.modi$File)) ### all 854 lakes' Kd files!
+
+all_Irr.modi = do.call(rbind, lapply(irrad.modi.files, function(x) 
+  transform(read.csv(paste("Data/WithinLakeData/IrradianceData/IrradModified/",x, sep="")), File = basename(x))))
+head(all_Irr.modi)
+length(unique(all_Irr.modi$File)) ### all 797 lakes' Irr files!
+
+### Step 3: Fix the filenames so that they match between the two datasets
+all_Kd.modi$FileNew0=sub(".{4}", "",all_Kd.modi$File)
+all_Kd.modi$FileName=gsub(".{21}$", "",all_Kd.modi$FileNew0)
+all_Kd.modi=all_Kd.modi[,-c(7,8)]
+head(all_Kd.modi)
+
+all_Irr.modi$FileNew0=sub(".{4}", "",all_Irr.modi$File)
+all_Irr.modi$FileName=gsub(".{24}$", "",all_Irr.modi$FileNew0)
+head(all_Irr.modi)
+all_Irr.modi=all_Irr.modi[,-c(7,8)]
+
+### Step 4: Before merging the two datasets, check for overlap between the dataset's new filenames
+length(intersect(all_Irr.modi$FileName, all_Kd.modi$FileName)) ## 772 file names IN COMMMON & 25 file names NOT IN COMMON!
+length(setdiff(all_Irr.modi$FileName, all_Kd.modi$FileName))
+length(setdiff(all_Kd.modi$FileName,all_Irr.modi$FileName))
+
+### Step 5: Merge Irr dataset to Kd datset, since latter is a larger set that contains all but 25 Irr lake files
+
+AllIrrKd_merge=inner_join(all_Irr.modi,all_Kd.modi, by=c("FileName","date"))
+head(AllIrrKd_merge)
+AllIrrKd=AllIrrKd_merge%>%
+select(FileName,date,year.x,month.x,yearday.x,day.x, everything())
+head(AllIrrKd)
+AllIrrKd=AllIrrKd_merge%>%
+select(FileName,date,year.x,month.x,yearday.x,day.x, everything())
+head(AllIrrKd)
+
+saveRDS(AllIrrKd, "Data/AllIrrKd_merge.rds")
+AllIrrKd=readRDS("Data/AllIrrKd_merge.rds")
+
+
+### Step 6: Read the depth Degree days dataset and check again for overlap in file names
+tempBydepth.data=read_csv("Data/WithinLakeData/TempData/dds_final.csv")
+tempBydepth.data
+colnames(tempBydepth.data)[2]="FileName"
+tempBydepth.data
+tibble(AllIrrKd)
+length(intersect(tempBydepth.data$FileName, AllIrrKd$FileName))
+
+###Running out of memmory, so using data.table functions
+library(data.table)
+TempDepth.dt=setDT(tempBydepth.data, key = c("FileName", "Year"))
+AAllIrrKd.dt=setDT(AllIrrKd, key = c("FileName", "Year"))
+IrrKd.DepthTemp.Join=AllIrrKd[TempDepth.dt, allow.cartesian=TRUE]
+IrrKd.DepthTemp.Join
+length(unique(IrrKd.DepthTemp.Join$FileName))
+
+IrrKd.DepthTemp.Join.NoNa=na.omit(IrrKd.DepthTemp.Join)
+length(unique(IrrKd.DepthTemp.Join.NoNa$FileName))
+IrrKd.DepthTemp.Join.NoNa
+saveRDS(IrrKd.DepthTemp.Join.NoNa, "Data/IrrKd.DepthTemp_merge.rds")
+IrrKd.DepthTemp=fread("Data/IrrKd.DepthTemp_merge.rds")
+
+IrrKd.DepthTemp$GLD=IrrKd.DepthTemp$Rad_0*(exp(-IrrKd.DepthTemp$Kd*IrrKd.DepthTemp$depth))
+IrrKd.DepthTemp
+saveRDS(IrrKd.DepthTemp,"Data/IrrKd.DepthTemp.GLD.rds")
+
+IrrKd.DepthTemp.GLD=readRDS("Data/IrrKd.DepthTemp.GLD.rds")
+IrrKd.DepthTemp.GLD
+
+IrrKd.DepthTemp.CummGLD=IrrKd.DepthTemp.GLD[, CummGLD:=cumsum(GLD), c("FileName","Year","depth")][]
+IrrKd.DepthTemp.CummGLD
+
+IrrKd.DepthTemp.AnnCummGLD=IrrKd.DepthTemp.CummGLD[IrrKd.DepthTemp.CummGLD[, .I[which.max(CummGLD)], by= c("FileName","Year", "depth")]$V1]
+IrrKd.DepthTemp.AnnCummGLD
+View(IrrKd.DepthTemp.AnnCummGLD[1:10000,])
+
+saveRDS(IrrKd.DepthTemp.AnnCummGLD,"Data/IrrKd.DepthTemp.AnnCummGLD.rds")
