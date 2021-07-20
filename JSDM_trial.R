@@ -3,7 +3,7 @@ library(Hmsc)
 library(snow)
 library(miceadds)
 
-###folderpath "/Users/thom7552/UMNpostdoc/ProjectEWM/RProjects/JSDMs_hmsc"
+###Folder Path "/Users/thom7552/UMNpostdoc/ProjectEWM/RProjects/JSDMs_hmsc"
 ###All data in the Data folder
 
 ###First load the entire JSDM dataset which contains year, lake ids, lake covariates, survey and sampling ids, and species presence absence (1/0) 
@@ -79,6 +79,7 @@ DOW_Top10PerTaxa_model
 load.Rdata("DOW_Top10PerTaxa_unfittedmodel.Rdata", "DOW_Top10PerTaxa_unfittedmodel")
 ufm=DOW_10PerTaxa_unfittedmodel
 
+### Finally, run the models
 samples_list = c(1000,1000,1000)
 thin_list = c(25,50, 100)
 nChains = 3
