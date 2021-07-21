@@ -11,7 +11,7 @@ JSDM.data=read_csv("Data/JSDM.newdata.csv")
 JSDM.data
 colnames(JSDM.data)[20]
 
-### Created a sub-species dataset that shows only species with lake level prevalence 10 percent and above
+### Dataset of species with lake level prevalence 10 percent and above
 Taxa_10Per=read_csv("Data/Taxa_10PerAbove.csv")
 Taxa_10Per
 TaxaNames_10Per=Taxa_10Per$Taxa
