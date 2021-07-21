@@ -20,7 +20,7 @@ TaxaNames_10Per
 JSDM.subdata=JSDM.data%>%select(c(1:20),all_of(TaxaNames_10Per))
 JSDM.subdata
 
-### A seperate df showing all 8 covariates and their names
+### A seperate df showing all 8 covariates and their names; rename covariates for clarity
 Xdata=as.data.frame(cbind(JSDM.subdata$DEPTH_MAX,JSDM.subdata$avgSECCHI,JSDM.subdata$Road_Density,JSDM.subdata$Littoral,
                           JSDM.subdata$GDD_WTR_10c,JSDM.subdata$Depth_mts,JSDM.subdata$DD,JSDM.subdata$CummGLD))
 colnames(Xdata)=c("MaxDepth", "AvgSecchi","RoadDensity","Littoral","SurfGDD","WithinLakeDepth","WithinLakeDegreeDays",
@@ -43,7 +43,7 @@ Ydata=as.matrix(JSDM.subdata[,c(21:61)])
 head(Ydata)
 dim(Ydata)
 
-### Defining lake ids (DOWLKNUM) as a random factor
+### Defining study design df and lake ids (DOWLKNUM) as a random factor
 DOWLKNUM=as.factor(JSDM.subdata$DOWLKNUM)
 sample.id=as.factor(1:length(JSDM.subdata$DOWLKNUM))
 studyDesign.subdata=data.frame(sample=sample.id, plot=DOWLKNUM)
@@ -75,13 +75,15 @@ DOW_Top10PerTaxa_model = Hmsc(Y=Ydata, XData = Xdata,
                            distr = "probit")
 
 DOW_Top10PerTaxa_model
+save(DOW_Top10PerTaxa_model,file="DOW_Top10PerTaxa_unfittedmodel.Rdata")
 
-load.Rdata("DOW_Top10PerTaxa_unfittedmodel.Rdata", "DOW_Top10PerTaxa_unfittedmodel")
-ufm=DOW_10PerTaxa_unfittedmodel
 
 ### Finally, run the models
-samples_list = c(1000,1000,1000)
-thin_list = c(25,50, 100)
+load.Rdata("DOW_Top10PerTaxa_unfittedsimplemodel.Rdata", "DOW_Top10PerTaxa_unfittedsimplemodel")
+ufm=DOW_10PerTaxa_unfittedmodel
+
+samples_list = c(1000,1000,1000,1000)
+thin_list = c(25,50,75,100)
 nChains = 3
 
 for(Lst in 1:length(samples_list)){
@@ -101,3 +103,4 @@ for(Lst in 1:length(samples_list)){
   save(fm, file=filename)
 }
 
+### Repeat steps 81 onwards for unfitted model with lake ids as random effects!
