@@ -53,7 +53,7 @@ rL.DOWLKNUM
 ranlevels = list("plot" = rL.DOWLKNUM)
 ranlevels
 
-
+### Combine study design, covariates and species data; and save as a single df
 SXY_10PerTaxa=cbind(studyDesign.subdata,Xdata,Ydata)
 head(SXY_10PerTaxa)
 write_csv(SXY_10PerTaxa,"Data/SXY_JSDMdata_10per.csv")
@@ -67,6 +67,7 @@ DOW_Top10PerTaxa_simplemodel = Hmsc(Y=Ydata, XData = Xdata,
 DOW_Top10PerTaxa_simplemodel
 save(DOW_Top10PerTaxa_simplemodel,file="DOW_Top10PerTaxa_unfittedsimplemodel.Rdata")
 
+### Define the models
 ### Model 2: Model with lake ids as random effects
 DOW_Top10PerTaxa_model = Hmsc(Y=Ydata, XData = Xdata,
                            XFormula = Xformula,
@@ -78,8 +79,33 @@ DOW_Top10PerTaxa_model
 save(DOW_Top10PerTaxa_model,file="DOW_Top10PerTaxa_unfittedmodel.Rdata")
 
 
-### Finally, run the models
+### Finally, run the pre-defined models
 load.Rdata("DOW_Top10PerTaxa_unfittedsimplemodel.Rdata", "DOW_Top10PerTaxa_unfittedsimplemodel")
+ufm=DOW_10PerTaxa_unfittedsimplemodel
+
+samples_list = c(1000,1000,1000,1000)
+thin_list = c(25,50,75,100)
+nChains = 3
+
+for(Lst in 1:length(samples_list)){
+  thin = thin_list[Lst]
+  samples = samples_list[Lst]
+  print(paste0("thin = ",as.character(thin),"; samples = ",as.character(samples)))
+  
+  fm = sampleMcmc(ufm, samples = samples, thin=thin,
+                   transient = ceiling(0.5*samples*thin),
+                   nChains = nChains, nParallel = nChains) 
+    
+  filename = paste("simp.models_thin_", as.character(thin),
+                   "_samples_", as.character(samples),
+                   "_chains_",as.character(nChains),
+                   ".Rdata",sep = "")
+
+  save(fm, file=filename)
+}
+
+### Repeat for unfitted model with lake ids as random effects
+load.Rdata("DOW_Top10PerTaxa_unfittedmodel.Rdata", "DOW_Top10PerTaxa_unfittedmodel")
 ufm=DOW_10PerTaxa_unfittedmodel
 
 samples_list = c(1000,1000,1000,1000)
@@ -95,12 +121,10 @@ for(Lst in 1:length(samples_list)){
                    transient = ceiling(0.5*samples*thin),
                    nChains = nChains, nParallel = nChains) 
     
-  filename = paste("models_thin_", as.character(thin),
+  filename = paste("lakran.models_thin_", as.character(thin),
                    "_samples_", as.character(samples),
                    "_chains_",as.character(nChains),
                    ".Rdata",sep = "")
 
   save(fm, file=filename)
 }
-
-### Repeat steps 81 onwards for unfitted model with lake ids as random effects!
